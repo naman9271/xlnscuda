@@ -17,17 +17,18 @@
 
 #define NUM_CASES 8
 #define NUM_BOOL_RESULTS 8
-#define NUM_LNS_RESULTS 3
+#define NUM_LNS_RESULTS 5
 
 static const char *bool_names[NUM_BOOL_RESULTS] = {
 	"is_zero", "is_negative", "is_positive", "gt", "lt", "eq", "ge", "le"
 };
 
 static const char *lns_names[NUM_LNS_RESULTS] = {
-	"max", "min", "copysign"
+	"max", "min", "copysign", "fma", "relu"
 };
 
 __global__ void xlns16d_utils_kernel(const xlns16 *a, const xlns16 *b,
+				     const xlns16 *c,
 				     int *bool_results, xlns16 *lns_results,
 				     int n)
 {
@@ -36,6 +37,7 @@ __global__ void xlns16d_utils_kernel(const xlns16 *a, const xlns16 *b,
 
 	xlns16 av = a[i];
 	xlns16 bv = b[i];
+	xlns16 cv = c[i];
 	int base_bool = i * NUM_BOOL_RESULTS;
 	int base_lns = i * NUM_LNS_RESULTS;
 
@@ -51,6 +53,8 @@ __global__ void xlns16d_utils_kernel(const xlns16 *a, const xlns16 *b,
 	lns_results[base_lns + 0] = xlns16d_max(av, bv);
 	lns_results[base_lns + 1] = xlns16d_min(av, bv);
 	lns_results[base_lns + 2] = xlns16d_copysign(av, bv);
+	lns_results[base_lns + 3] = xlns16d_fma(av, bv, cv);
+	lns_results[base_lns + 4] = xlns16d_relu(av);
 }
 
 static int check_bool_result(int case_idx, int result_idx, int expected, int got)
@@ -104,10 +108,10 @@ int main(void)
 	xlns16 h_a[NUM_CASES] = {
 		/* zero */
 		xlns16_zero,
-		/* positive */
-		xlns16_one,
-		/* negative */
-		xlns16_neg_one,
+		/* positive / fma(2, 3, 4) */
+		xlns16_two,
+		/* negative / fma(-2, 3, 4) */
+		xlns16_neg_two,
 		/* gt/lt */
 		xlns16_two,
 		/* eq/ge/le */
@@ -122,10 +126,10 @@ int main(void)
 	xlns16 h_b[NUM_CASES] = {
 		/* zero */
 		xlns16_zero,
-		/* positive */
-		xlns16_two,
-		/* negative */
-		xlns16_neg_two,
+		/* positive / fma(2, 3, 4) */
+		fp2xlns16(3.0f),
+		/* negative / fma(-2, 3, 4) */
+		fp2xlns16(3.0f),
 		/* gt/lt */
 		xlns16_one,
 		/* eq/ge/le */
@@ -136,6 +140,24 @@ int main(void)
 		fp2xlns16(0.25f),
 		/* mixed edge */
 		fp2xlns16(-4.0f)
+	};
+	xlns16 h_c[NUM_CASES] = {
+		/* zero */
+		xlns16_zero,
+		/* positive */
+		fp2xlns16(4.0f),
+		/* negative */
+		fp2xlns16(4.0f),
+		/* gt/lt */
+		xlns16_zero,
+		/* eq/ge/le */
+		xlns16_zero,
+		/* max/min */
+		xlns16_zero,
+		/* copysign */
+		xlns16_zero,
+		/* mixed edge */
+		xlns16_zero
 	};
 
 	int expected_bool[NUM_CASES * NUM_BOOL_RESULTS];
@@ -158,21 +180,26 @@ int main(void)
 		expected_lns[base_lns + 0] = xlns16_max(h_a[i], h_b[i]);
 		expected_lns[base_lns + 1] = xlns16_min(h_a[i], h_b[i]);
 		expected_lns[base_lns + 2] = xlns16_copysign(h_a[i], h_b[i]);
+		expected_lns[base_lns + 3] = xlns16_add(xlns16_mul(h_a[i], h_b[i]), h_c[i]);
+		expected_lns[base_lns + 4] = xlns16_is_negative(h_a[i]) ? xlns16_zero : h_a[i];
 	}
 
 	xlns16 *d_a = 0;
 	xlns16 *d_b = 0;
+	xlns16 *d_c = 0;
 	int *d_bool = 0;
 	xlns16 *d_lns = 0;
 
 	CHECK_CUDA(cudaMalloc((void **)&d_a, sizeof(h_a)));
 	CHECK_CUDA(cudaMalloc((void **)&d_b, sizeof(h_b)));
+	CHECK_CUDA(cudaMalloc((void **)&d_c, sizeof(h_c)));
 	CHECK_CUDA(cudaMalloc((void **)&d_bool, sizeof(got_bool)));
 	CHECK_CUDA(cudaMalloc((void **)&d_lns, sizeof(got_lns)));
 	CHECK_CUDA(cudaMemcpy(d_a, h_a, sizeof(h_a), cudaMemcpyHostToDevice));
 	CHECK_CUDA(cudaMemcpy(d_b, h_b, sizeof(h_b), cudaMemcpyHostToDevice));
+	CHECK_CUDA(cudaMemcpy(d_c, h_c, sizeof(h_c), cudaMemcpyHostToDevice));
 
-	xlns16d_utils_kernel<<<1, 32>>>(d_a, d_b, d_bool, d_lns, NUM_CASES);
+	xlns16d_utils_kernel<<<1, 32>>>(d_a, d_b, d_c, d_bool, d_lns, NUM_CASES);
 	CHECK_CUDA(cudaGetLastError());
 	CHECK_CUDA(cudaDeviceSynchronize());
 
@@ -195,6 +222,7 @@ int main(void)
 
 	CHECK_CUDA(cudaFree(d_a));
 	CHECK_CUDA(cudaFree(d_b));
+	CHECK_CUDA(cudaFree(d_c));
 	CHECK_CUDA(cudaFree(d_bool));
 	CHECK_CUDA(cudaFree(d_lns));
 

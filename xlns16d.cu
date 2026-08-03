@@ -252,11 +252,22 @@ __device__ inline xlns16 xlns16d_copysign(xlns16 x, xlns16 y)
 	return xlns16_abs(x) | xlns16_sign(y);
 }
 
+__device__ inline xlns16 xlns16d_fma(xlns16 a, xlns16 b, xlns16 c)
+{
+	return xlns16d_add(xlns16d_mul(a, b), c);
+}
+
+__device__ inline xlns16 xlns16d_relu(xlns16 x)
+{
+	return xlns16d_is_negative(x) ? xlns16_zero : x;
+}
+
 /*END OF PORTABLE CODE*/
 
 /*START OF PORTABLE CODE THAT DEPENDS ON <math.h>*/
 
 #include <math.h>
+#include <stddef.h>
 
 /*END OF PORTABLE CODE THAT DEPENDS ON <math.h>*/
 
@@ -288,6 +299,32 @@ __device__ float xlns16d2fp(xlns16 x)
 		return (float) (+pow(2.0,((double) (((xlns16_signed) (xlns16_abs(x)-xlns16_logsignmask))))
 					/((float) xlns16_scale)));
 	}
+}
+
+__device__ inline xlns16 xlns16d_from_float(float x)
+{
+	return fp2xlns16d(x);
+}
+
+__device__ inline float xlns16d_to_float(xlns16 x)
+{
+	return xlns16d2fp(x);
+}
+
+__global__ void xlns16d_batch_from_float_kernel(const float *src, xlns16 *dst, size_t n)
+{
+	size_t i = blockIdx.x * blockDim.x + threadIdx.x;
+	size_t stride = blockDim.x * gridDim.x;
+	for (; i < n; i += stride)
+		dst[i] = xlns16d_from_float(src[i]);
+}
+
+__global__ void xlns16d_batch_to_float_kernel(const xlns16 *src, float *dst, size_t n)
+{
+	size_t i = blockIdx.x * blockDim.x + threadIdx.x;
+	size_t stride = blockDim.x * gridDim.x;
+	for (; i < n; i += stride)
+		dst[i] = xlns16d_to_float(src[i]);
 }
 
 
