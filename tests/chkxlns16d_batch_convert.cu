@@ -6,6 +6,7 @@
 #define xlns16_alt
 #include "../xlnscpp/xlns16.cpp"
 #include "../xlns16d.cu"
+#include "../xlns16d_batch.cu"
 
 #define CHECK_CUDA(call) \
 	do { \
@@ -19,22 +20,6 @@
 
 #define FROM_FLOAT_MAX_ERROR_PERCENT 1.0f
 #define TO_FLOAT_MAX_ERROR_PERCENT 0.001f
-
-static __global__ void test_xlns16d_batch_from_float_kernel(const float *src, xlns16 *dst, size_t n)
-{
-	size_t i = blockIdx.x * blockDim.x + threadIdx.x;
-	size_t stride = blockDim.x * gridDim.x;
-	for (; i < n; i += stride)
-		dst[i] = xlns16d_from_float(src[i]);
-}
-
-static __global__ void test_xlns16d_batch_to_float_kernel(const xlns16 *src, float *dst, size_t n)
-{
-	size_t i = blockIdx.x * blockDim.x + threadIdx.x;
-	size_t stride = blockDim.x * gridDim.x;
-	for (; i < n; i += stride)
-		dst[i] = xlns16d_to_float(src[i]);
-}
 
 static float percent_error(float expected, float got)
 {
@@ -59,8 +44,7 @@ static int check_from_float(const char *name, const float *src, size_t n, int *b
 	CHECK_CUDA(cudaMalloc((void **)&d_dst, n * sizeof(got[0])));
 	CHECK_CUDA(cudaMemcpy(d_src, src, n * sizeof(src[0]), cudaMemcpyHostToDevice));
 
-	test_xlns16d_batch_from_float_kernel<<<(unsigned)((n + 31) / 32), 32>>>(d_src, d_dst, n);
-	CHECK_CUDA(cudaGetLastError());
+	CHECK_CUDA(xlns16d_batch_from_float(d_src, d_dst, n));
 	CHECK_CUDA(cudaDeviceSynchronize());
 	CHECK_CUDA(cudaMemcpy(got, d_dst, n * sizeof(got[0]), cudaMemcpyDeviceToHost));
 
@@ -102,8 +86,7 @@ static int check_to_float(const char *name, const xlns16 *src, size_t n)
 	CHECK_CUDA(cudaMalloc((void **)&d_dst, n * sizeof(got[0])));
 	CHECK_CUDA(cudaMemcpy(d_src, src, n * sizeof(src[0]), cudaMemcpyHostToDevice));
 
-	test_xlns16d_batch_to_float_kernel<<<(unsigned)((n + 31) / 32), 32>>>(d_src, d_dst, n);
-	CHECK_CUDA(cudaGetLastError());
+	CHECK_CUDA(xlns16d_batch_to_float(d_src, d_dst, n));
 	CHECK_CUDA(cudaDeviceSynchronize());
 	CHECK_CUDA(cudaMemcpy(got, d_dst, n * sizeof(got[0]), cudaMemcpyDeviceToHost));
 
@@ -128,11 +111,9 @@ static int check_to_float(const char *name, const xlns16 *src, size_t n)
 static int check_empty(void)
 {
 	printf("\n[empty]\n");
-	test_xlns16d_batch_from_float_kernel<<<1, 32>>>(0, 0, 0);
-	CHECK_CUDA(cudaGetLastError());
+	CHECK_CUDA(xlns16d_batch_from_float(0, 0, 0));
 	CHECK_CUDA(cudaDeviceSynchronize());
-	test_xlns16d_batch_to_float_kernel<<<1, 32>>>(0, 0, 0);
-	CHECK_CUDA(cudaGetLastError());
+	CHECK_CUDA(xlns16d_batch_to_float(0, 0, 0));
 	CHECK_CUDA(cudaDeviceSynchronize());
 	printf("empty kernels completed\n");
 	return 0;
