@@ -311,22 +311,6 @@ __device__ inline float xlns16d_to_float(xlns16 x)
 	return xlns16d2fp(x);
 }
 
-__global__ void xlns16d_batch_from_float_kernel(const float *src, xlns16 *dst, size_t n)
-{
-	size_t i = blockIdx.x * blockDim.x + threadIdx.x;
-	size_t stride = blockDim.x * gridDim.x;
-	for (; i < n; i += stride)
-		dst[i] = xlns16d_from_float(src[i]);
-}
-
-__global__ void xlns16d_batch_to_float_kernel(const xlns16 *src, float *dst, size_t n)
-{
-	size_t i = blockIdx.x * blockDim.x + threadIdx.x;
-	size_t stride = blockDim.x * gridDim.x;
-	for (; i < n; i += stride)
-		dst[i] = xlns16d_to_float(src[i]);
-}
-
 
 #include <iostream>
 
