@@ -16,7 +16,11 @@ Example from the `xlnscuda` repository root:
 ```sh
 nvcc -std=c++11 tests/chkxlns16d_utils.cu -o /tmp/chkxlns16d_utils
 nvcc -std=c++11 tests/chkxlns32d_utils.cu -o /tmp/chkxlns32d_utils
+nvcc -std=c++11 tests/chkxlns16d_batch_convert.cu -o /tmp/chkxlns16d_batch_convert
+nvcc -std=c++11 tests/chkxlns32d_batch_convert.cu -o /tmp/chkxlns32d_batch_convert
 
 /tmp/chkxlns16d_utils
 /tmp/chkxlns32d_utils
+/tmp/chkxlns16d_batch_convert
+/tmp/chkxlns32d_batch_convert
 ```
