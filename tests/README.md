@@ -18,9 +18,17 @@ nvcc -std=c++11 tests/chkxlns16d_utils.cu -o /tmp/chkxlns16d_utils
 nvcc -std=c++11 tests/chkxlns32d_utils.cu -o /tmp/chkxlns32d_utils
 nvcc -std=c++11 tests/chkxlns16d_batch_convert.cu -o /tmp/chkxlns16d_batch_convert
 nvcc -std=c++11 tests/chkxlns32d_batch_convert.cu -o /tmp/chkxlns32d_batch_convert
+nvcc -std=c++11 tests/chkxlns16d_helper_functions.cu -o /tmp/chkxlns16d_helper_functions
+nvcc -std=c++11 tests/chkxlns32d_helper_functions.cu -o /tmp/chkxlns32d_helper_functions
+nvcc -std=c++11 tests/chkxlns16d_softmax_layernorm.cu -o /tmp/chkxlns16d_softmax_layernorm
+nvcc -std=c++11 tests/chkxlns32d_softmax_layernorm.cu -o /tmp/chkxlns32d_softmax_layernorm
 
 /tmp/chkxlns16d_utils
 /tmp/chkxlns32d_utils
 /tmp/chkxlns16d_batch_convert
 /tmp/chkxlns32d_batch_convert
+/tmp/chkxlns16d_helper_functions
+/tmp/chkxlns32d_helper_functions
+/tmp/chkxlns16d_softmax_layernorm
+/tmp/chkxlns32d_softmax_layernorm
 ```

@@ -311,6 +311,198 @@ __device__ inline float xlns16d_to_float(xlns16 x)
 	return xlns16d2fp(x);
 }
 
+__device__ inline xlns16 xlns16d_sum(const xlns16 *a, size_t n)
+{
+	if (n == 0) return xlns16_zero;
+	xlns16 sum = a[0];
+	for (size_t i = 1; i < n; i++) {
+		sum = xlns16d_add(sum, a[i]);
+	}
+	return sum;
+}
+
+__device__ inline xlns16 xlns16d_vec_dot(const xlns16 *a, const xlns16 *b, size_t n)
+{
+	if (n == 0) return xlns16_zero;
+	xlns16 sum = xlns16d_mul(a[0], b[0]);
+	for (size_t i = 1; i < n; i++) {
+		sum = xlns16d_add(sum, xlns16d_mul(a[i], b[i]));
+	}
+	return sum;
+}
+
+__device__ inline float xlns16d_vec_dot_f32(const float *a, const float *b, size_t n)
+{
+	if (n == 0) return 0.0f;
+	xlns16 sum = xlns16d_mul(fp2xlns16d(a[0]), fp2xlns16d(b[0]));
+	for (size_t i = 1; i < n; i++) {
+		xlns16 prod = xlns16d_mul(fp2xlns16d(a[i]), fp2xlns16d(b[i]));
+		sum = xlns16d_add(sum, prod);
+	}
+	return xlns16d2fp(sum);
+}
+
+__device__ inline xlns16 xlns16d_max_array(const xlns16 *a, size_t n)
+{
+	if (n == 0) return xlns16_zero;
+	xlns16 maxval = a[0];
+	for (size_t i = 1; i < n; i++) {
+		if (xlns16d_gt(a[i], maxval)) {
+			maxval = a[i];
+		}
+	}
+	return maxval;
+}
+
+__device__ inline xlns16 xlns16d_min_array(const xlns16 *a, size_t n)
+{
+	if (n == 0) return xlns16_zero;
+	xlns16 minval = a[0];
+	for (size_t i = 1; i < n; i++) {
+		if (xlns16d_lt(a[i], minval)) {
+			minval = a[i];
+		}
+	}
+	return minval;
+}
+
+__device__ inline xlns16 xlns16d_sigmoid(xlns16 x)
+{
+	float fx = xlns16d2fp(x);
+	float z = -fx * 1.4426950408889634f;
+	xlns16_signed sz = (xlns16_signed)(z * xlns16_scale + (z >= 0 ? 0.5f : -0.5f));
+	return xlns16_logsignmask - xlns16d_sb(sz);
+}
+
+__device__ inline xlns16 xlns16d_silu(xlns16 x)
+{
+	return xlns16d_mul(x, xlns16d_sigmoid(x));
+}
+
+__device__ inline xlns16 xlns16d_exp(xlns16 x)
+{
+	float fx = xlns16d2fp(x);
+	return fp2xlns16d(exp(fx));
+}
+
+__device__ inline xlns16 xlns16d_log(xlns16 x)
+{
+	float fx = xlns16d2fp(x);
+	if (fx <= 0.0f) return xlns16_zero;
+	return fp2xlns16d(log(fx));
+}
+
+__device__ inline xlns16 xlns16d_tanh(xlns16 x)
+{
+	const xlns16 exp2x = xlns16d_exp(xlns16d_mul(x, xlns16_two));
+	return xlns16d_div(xlns16d_sub(exp2x, xlns16_one),
+			   xlns16d_add(exp2x, xlns16_one));
+}
+
+__device__ inline xlns16 xlns16d_gelu(xlns16 x)
+{
+	const xlns16 sqrt2_over_pi = fp2xlns16d(0.7978845608);
+	const xlns16 coeff = fp2xlns16d(0.044715);
+	const xlns16 x3 = xlns16d_mul(xlns16d_mul(x, x), x);
+	const xlns16 inner = xlns16d_mul(sqrt2_over_pi,
+				 xlns16d_add(x, xlns16d_mul(coeff, x3)));
+	return xlns16d_mul(xlns16d_mul(xlns16_half, x),
+			   xlns16d_add(xlns16_one, xlns16d_tanh(inner)));
+}
+
+__device__ inline xlns16 xlns16d_exp2(xlns16 x)
+{
+	float fx = xlns16d2fp(x);
+	return fp2xlns16d(pow(2.0, fx));
+}
+
+__device__ inline xlns16 xlns16d_log2(xlns16 x)
+{
+	float fx = xlns16d2fp(x);
+	if (fx <= 0.0f) return xlns16_zero;
+	return fp2xlns16d(log(fx) / log(2.0));
+}
+
+__device__ inline xlns16 xlns16d_pow(xlns16 base, xlns16 exponent)
+{
+	float fbase = xlns16d2fp(base);
+	float fexp = xlns16d2fp(exponent);
+	if (fbase <= 0.0f) return xlns16_zero;
+	return fp2xlns16d(powf(fbase, fexp));
+}
+
+__device__ inline void xlns16d_softmax_exp(const xlns16 *a, xlns16 *c, size_t n)
+{
+	xlns16 maxval = xlns16d_max_array(a, n);
+	for (size_t i = 0; i < n; i++) {
+		float fx = xlns16d2fp(a[i]) - xlns16d2fp(maxval);
+		c[i] = fp2xlns16d(exp(fx));
+	}
+}
+
+__device__ inline void xlns16d_softmax(const xlns16 *a, xlns16 *c, size_t n,
+				       xlns16 scale)
+{
+	if (n == 0) return;
+	xlns16 maxval = xlns16_neg_inf;
+	for (size_t i = 0; i < n; i++) {
+		xlns16 v = a[i];
+		if (v != xlns16_neg_inf) v = xlns16d_mul(v, scale);
+		c[i] = v;
+		if (xlns16d_gt(c[i], maxval)) maxval = c[i];
+	}
+	for (size_t i = 0; i < n; i++)
+		c[i] = xlns16d_exp(xlns16d_sub(c[i], maxval));
+	xlns16 total = xlns16d_sum(c, n);
+	for (size_t i = 0; i < n; i++)
+		c[i] = xlns16d_div(c[i], total);
+}
+
+__device__ inline void xlns16d_softmax_masked(const xlns16 *a, const xlns16 *mask,
+					      xlns16 *c, size_t n, xlns16 scale)
+{
+	if (n == 0) return;
+	xlns16 maxval = xlns16_neg_inf;
+	for (size_t i = 0; i < n; i++) {
+		xlns16 v = a[i];
+		if (v != xlns16_neg_inf) {
+			v = xlns16d_mul(v, scale);
+			if (mask[i] == xlns16_neg_inf) v = xlns16_neg_inf;
+			else if (!xlns16d_is_zero(mask[i])) v = xlns16d_add(v, mask[i]);
+		}
+		c[i] = v;
+		if (xlns16d_gt(c[i], maxval)) maxval = c[i];
+	}
+	for (size_t i = 0; i < n; i++)
+		c[i] = xlns16d_exp(xlns16d_sub(c[i], maxval));
+	xlns16 total = xlns16d_sum(c, n);
+	for (size_t i = 0; i < n; i++)
+		c[i] = xlns16d_div(c[i], total);
+}
+
+__device__ inline void xlns16d_layernorm(const xlns16 *x, xlns16 *out,
+					 const xlns16 *gamma, const xlns16 *beta,
+					 size_t n, float eps)
+{
+	if (n == 0) return;
+	xlns16 mean = xlns16d_sum(x, n);
+	mean = xlns16d_div(mean, fp2xlns16d((float)n));
+
+	xlns16 var = xlns16_zero;
+	for (size_t i = 0; i < n; i++) {
+		xlns16 diff = xlns16d_sub(x[i], mean);
+		var = xlns16d_add(var, xlns16d_mul(diff, diff));
+	}
+	var = xlns16d_div(var, fp2xlns16d((float)n));
+
+	xlns16 inv_std = fp2xlns16d(1.0f / sqrt(xlns16d2fp(var) + eps));
+	for (size_t i = 0; i < n; i++) {
+		out[i] = xlns16d_mul(xlns16d_sub(x[i], mean), inv_std);
+		if (gamma) out[i] = xlns16d_mul(out[i], gamma[i]);
+		if (beta) out[i] = xlns16d_add(out[i], beta[i]);
+	}
+}
+
 
 #include <iostream>
 
