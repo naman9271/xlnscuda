@@ -388,13 +388,26 @@ __device__ inline xlns32 xlns32d_min_array(const xlns32 *a, size_t n)
 	return minval;
 }
 
-__device__ inline xlns32 xlns32d_sigmoid(xlns32 x)
-{
+#ifdef xlns32_sigmoid_sb
+ __device__ inline xlns32 xlns32d_sigmoid(xlns32 x)
+ {
 	float fx = xlns32d2fp(x);
 	float z = -fx * 1.4426950408889634f;
 	xlns32_signed sz = (xlns32_signed)(z * xlns32_scale + (z >= 0 ? 0.5f : -0.5f));
-	return xlns32_logsignmask - xlns32d_sb(sz);
-}
+    	if (sz > 0)  // xlns32_sb only valid for sz>0
+      		return xlns32_logsignmask - xlns32d_sb(sz);
+    	else
+      		return xlns32_logsignmask - sz - xlns32d_sb(-sz);
+ }
+ #else
+ // Note: Uses float conversion for exp() then converts back
+ __device__ inline xlns32 xlns32d_sigmoid(xlns32 x) 
+ {
+    float fx = xlns32d2fp(x);
+    float result = 1.0f / (1.0f + exp(-fx));
+    return fp2xlns32d(result);
+ }
+#endif
 
 __device__ inline xlns32 xlns32d_tanh(xlns32 x)
 {
