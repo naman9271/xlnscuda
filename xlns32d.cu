@@ -92,7 +92,7 @@ inline __device__ xlns32 xlns32d_div(xlns32 x, xlns32 y)
 	         +(((xlns32)xlns32d_sbhtable[zh])<<16)+xlns32d_sbltable[zh])
 	       +( ( ((xlns32_zlmask+1)-(xlns32_zlmask&
 	                ((xlns32d_sbltable[zh]-xlns32d_sbltable[zh+1]))))
-	            *(z&xlns32_zlmask) )>>xlns32_zhshift );
+	            *(z&xlns32_zlmask) +(1<<(xlns32_zhshift-1)) )>>xlns32_zhshift );
   }
 
   inline __device__ xlns32 xlns32d_dbtrans3(xlns32 z)
