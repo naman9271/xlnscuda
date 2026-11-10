@@ -440,15 +440,26 @@ __device__ inline xlns16 xlns16d_sigmoid(xlns16 x)
 }
 
 #else
-
-__device__ inline xlns16 xlns16d_sigmoid(xlns16 x)
-{
+ // Gaussian log sb ior naive fallback when xlns16_table is not defined
+ #ifdef xlns16_sigmoid_sb
+ __device__ inline xlns16 xlns16d_sigmoid(xlns16 x)
+ {
 	float fx = xlns16d2fp(x);
 	float z = -fx * 1.4426950408889634f;
 	xlns16_signed sz = (xlns16_signed)(z * xlns16_scale + (z >= 0 ? 0.5f : -0.5f));
-	return xlns16_logsignmask - xlns16d_sb(sz);
-}
-
+   	if (sz > 0)  // xlns16d_sb only valid for sz>0
+		return xlns16_logsignmask - xlns16d_sb(sz);
+    	else
+        	return xlns16_logsignmask - sz - xlns16d_sb(-sz);
+ }
+ #else
+ __device__ inline xlns16 xlns16d_sigmoid(xlns16 x) 
+ {
+    float fx = xlns16d2fp(x);
+    float result = 1.0f / (1.0f + exp(-fx));
+    return fp2xlns16d(result);
+ }
+ #endif
 #endif
 
 __device__ inline xlns16 xlns16d_silu(xlns16 x)
